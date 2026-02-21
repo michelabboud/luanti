@@ -90,6 +90,32 @@ jobs:
           cd nowrite
           ../bin/luanti --run-unittests
 
+      - name: Run benchmarks
+        # continue-on-error so a changed CLI flag doesn't block the build
+        continue-on-error: true
+        run: ./bin/luantiserver --run-benchmarks -- --reporter json --out benchmark-results.json
+
+      - name: Store benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.ref == 'refs/heads/master'
+        with:
+          tool: catch2
+          output-file-path: benchmark-results.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: dev/bench
+          alert-threshold: '200%'
+          comment-on-alert: true
+          fail-on-alert: false
+
+      - name: Upload benchmark artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results.json
+
   # Older clang version (should be close to our minimum supported version)
   clang_11:
     runs-on: ubuntu-22.04
@@ -171,3 +197,52 @@ jobs:
       - name: Test
         run: |
           ./bin/luantiserver --run-unittests
+
+  # Code coverage using gcov/lcov on GCC 14
+  coverage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          source ./util/ci/common.sh
+          install_linux_deps --headless g++-14 lcov
+
+      - name: Build with coverage instrumentation
+        run: ./util/ci/build.sh
+        env:
+          CC: gcc-14
+          CXX: g++-14
+          CMAKE_FLAGS: >-
+            -DCMAKE_BUILD_TYPE=Debug
+            -DRUN_IN_PLACE=TRUE
+            -DBUILD_SERVER=TRUE
+            -DCMAKE_CXX_FLAGS="--coverage -O0"
+            -DCMAKE_C_FLAGS="--coverage -O0"
+            -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+
+      - name: Run unit tests
+        run: ./bin/luantiserver --run-unittests
+
+      - name: Generate coverage report
+        run: |
+          lcov --capture --directory . --output-file coverage.lcov
+          lcov --remove coverage.lcov \
+            '/usr/*' \
+            '*/lib/catch2/*' \
+            '*/unittest/*' \
+            --output-file coverage.lcov
+          genhtml coverage.lcov --output-directory coverage-html
+
+      - name: Upload HTML artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage-html/
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.lcov
+          fail_ci_if_error: false

@@ -1,0 +1,37 @@
+name: security
+
+# Scan vendored libraries for known CVEs using OSV (Open Source Vulnerability database).
+# The SBOM (.cyclonedx.json) lists all vendored libs with their versions.
+# Update .cyclonedx.json whenever a vendored library is upgraded.
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'lib/**'
+      - '.cyclonedx.json'
+      - '.github/workflows/security.yml'
+  pull_request:
+    paths:
+      - 'lib/**'
+      - '.cyclonedx.json'
+      - '.github/workflows/security.yml'
+  schedule:
+    # Weekly scan every Monday at 08:00 UTC to catch newly disclosed CVEs
+    - cron: '0 8 * * 1'
+
+jobs:
+  osv-scan:
+    name: OSV vulnerability scan
+    runs-on: ubuntu-24.04
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan SBOM for known vulnerabilities
+        uses: google/osv-scanner-action@v2
+        with:
+          scan-args: |-
+            --sbom=.cyclonedx.json

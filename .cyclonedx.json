@@ -1,0 +1,141 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.4",
+  "version": 1,
+  "serialNumber": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "metadata": {
+    "timestamp": "2026-02-21T00:00:00Z",
+    "tools": [
+      {
+        "vendor": "CycloneDX",
+        "name": "manual",
+        "version": "1.4"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "luanti",
+      "description": "Free, open-source voxel game engine",
+      "licenses": [
+        {
+          "license": {
+            "id": "LGPL-2.1-or-later"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.luanti.org"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/luanti-org/luanti"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "lua",
+      "version": "5.1.4",
+      "description": "Vendored Lua 5.1 interpreter (lib/lua/)",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:generic/lua@5.1.4",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.lua.org"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "jsoncpp",
+      "version": "1.9.7",
+      "description": "Vendored JsonCpp JSON parser (lib/jsoncpp/)",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:github/open-source-parsers/jsoncpp@1.9.7",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/open-source-parsers/jsoncpp"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "Catch2",
+      "version": "3.6.0",
+      "description": "Vendored Catch2 unit testing framework (lib/catch2/)",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSL-1.0"
+          }
+        }
+      ],
+      "purl": "pkg:github/catchorg/Catch2@v3.6.0",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/catchorg/Catch2"
+        }
+      ],
+      "scope": "optional"
+    },
+    {
+      "type": "library",
+      "name": "lua-bitop",
+      "version": "1.0.2",
+      "description": "Vendored Lua BitOp bit manipulation library (lib/bitop/)",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:generic/lua-bitop@1.0.2",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://bitop.luajit.org"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "tiniergltf",
+      "version": "1.0.0",
+      "description": "Vendored tiniergltf glTF 2.0 parser (lib/tiniergltf/)",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:generic/tiniergltf@1.0.0",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/JosiahWI/tiniergltf"
+        }
+      ]
+    }
+  ]
+}
