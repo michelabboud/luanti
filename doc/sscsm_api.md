@@ -59,6 +59,18 @@ Functions that take or return paths always use virtual paths.
 * `core.get_name_from_content_id(id)`
 
 
+### Global tables
+
+#### Registered definition tables
+
+* `core.registered_items`
+* `core.registered_nodes`
+* `core.registered_tools`
+* `core.registered_craftitems`
+* `core.registered_aliases`
+  * TODO still empty
+
+
 ### Util API
 
 * `core.log([level,] text)`
@@ -148,9 +160,9 @@ Functions that take or return paths always use virtual paths.
 ### Lua standard library
 
 * `assert`
-* `collectgarbage`
+* `collectgarbage("count")`
+  * Rounded, other modes are unsupported and will do nothing and return nothing.
 * `error`
-* `getfenv`
 * `ipairs`
 * `next`
 * `pairs`
@@ -160,7 +172,6 @@ Functions that take or return paths always use virtual paths.
 * `rawget`
 * `rawset`
 * `select`
-* `setfenv`
 * `getmetatable`
 * `setmetatable`
 * `tonumber`
