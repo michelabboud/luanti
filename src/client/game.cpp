@@ -1493,7 +1493,7 @@ void Game::processKeyInput()
 	} else if (wasKeyDown(KeyType::CINEMATIC)) {
 		toggleCinematic();
 	} else if (wasKeyPressed(KeyType::SCREENSHOT)) {
-		client->makeScreenshot();
+		client->requestScreenshot();
 	} else if (wasKeyPressed(KeyType::TOGGLE_BLOCK_BOUNDS)) {
 		toggleBlockBounds();
 	} else if (wasKeyPressed(KeyType::TOGGLE_HUD)) {
@@ -2628,8 +2628,7 @@ void Game::updateCameraOffset()
 			shadow->getDirectionalLight().updateCameraOffset(camera);
 			// FIXME: I bet we can be smarter about this and don't need to redraw
 			// the shadow map at all, but this is for someone else to figure out.
-			if (!g_settings->getFlag("performance_tradeoffs"))
-				shadow->setForceUpdateShadowMap();
+			shadow->setForceUpdateShadowMap();
 		}
 
 		env.getClientMap().updateCamera(camera->getPosition(),
@@ -3286,8 +3285,9 @@ void Game::handleDigging(const PointedThing &pointed, const v3s16 &nodepos,
 		runData.dig_time_complete = 10000000.0;
 	} else {
 		runData.dig_time_complete = params.time;
-
-		client->getParticleManager()->addNodeParticle(player, nodepos, n);
+		if (g_settings->getBool("enable_dig_particles")) {
+			client->getParticleManager()->addNodeParticle(player, nodepos, n);
+		}
 	}
 
 	if (!runData.digging) {
@@ -3372,7 +3372,9 @@ void Game::handleDigging(const PointedThing &pointed, const v3s16 &nodepos,
 
 		client->interact(INTERACT_DIGGING_COMPLETED, pointed);
 
-		client->getParticleManager()->addDiggingParticles(player, nodepos, n);
+		if (g_settings->getBool("enable_dig_particles")) {
+			client->getParticleManager()->addDiggingParticles(player, nodepos, n);
+		}
 
 		// Send event to trigger sound
 		client->getEventManager()->put(new NodeDugEvent(nodepos, n));
@@ -3524,17 +3526,19 @@ void Game::updateFrame(ProfilerGraph *graph, RunStats *stats, f32 dtime,
 
 	v3f camera_direction = camera->getDirection();
 
+	auto &client_map = client->getEnv().getClientMap();
+
 	// call only one of updateDrawList, touchMapBlocks, or updateShadow per frame
 	// (the else-ifs below are intentional)
 	if (runData.update_draw_list_timer >= update_draw_list_delta
-			|| runData.update_draw_list_last_cam_dir.getDistanceFrom(camera_direction) > 0.2
+			|| runData.update_draw_list_last_cam_dir.getDistanceFrom(camera_direction) > 0.2f
 			|| m_camera_offset_changed
-			|| client->getEnv().getClientMap().needsUpdateDrawList()) {
+			|| client_map.needsUpdateDrawList()) {
+		client_map.updateDrawList();
 		runData.update_draw_list_timer = 0;
-		client->getEnv().getClientMap().updateDrawList();
 		runData.update_draw_list_last_cam_dir = camera_direction;
 	} else if (runData.touch_blocks_timer > touch_mapblock_delta) {
-		client->getEnv().getClientMap().touchMapBlocks();
+		client_map.touchMapBlocks();
 		runData.touch_blocks_timer = 0;
 	} else if (RenderingEngine::get_shadow_renderer()) {
 		updateShadows();
@@ -3706,6 +3710,9 @@ void Game::drawScene(ProfilerGraph *graph, RunStats *stats)
 					core::rect<s32>(0, 0, screensize.X, screensize.Y),
 					NULL);
 	}
+
+	// Must be called immediately before endScene() to capture the rendered frame
+	this->client->takeScreenshotIfRequested();
 
 	this->driver->endScene();
 

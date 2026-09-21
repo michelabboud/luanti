@@ -164,8 +164,8 @@ static u16 getSmoothLightCombined(const v3s16 &p,
 		const ContentFeatures &f = ndef->get(n);
 		if (f.light_source > light_source_max)
 			light_source_max = f.light_source;
-		// Check f.solidness because fast-style leaves look better this way
-		if (f.param_type == CPT_LIGHT && f.visuals->solidness != 2) {
+		// Check solidness because fast-style leaves look better this way
+		if (f.param_type == CPT_LIGHT && NDT_solidness[f.drawtype] != 2) {
 			u8 light_level_day = n.getLight(LIGHTBANK_DAY, f.getLightingFlags());
 			u8 light_level_night = n.getLight(LIGHTBANK_NIGHT, f.getLightingFlags());
 			if (light_level_day == LIGHT_SUN)
@@ -852,7 +852,7 @@ void MapBlockMesh::updateTransparentBuffers(v3f camera_pos, v3s16 block_pos,
 			current_buffer = t.buffer;
 			if (group_by_buffers) {
 				auto it = strain_idxs.find(current_buffer);
-				assert(it != strain_idxs.end());
+				sanity_check(it != strain_idxs.end());
 				current_strain = &ordered_strains[it->second].second;
 			} else {
 				ordered_strains.emplace_back(current_buffer, std::vector<u16>{});
@@ -955,7 +955,7 @@ u8 get_solid_sides(MeshMakeData *data)
 
 		for (u8 k = 0; k < 6; k++) {
 			const MapNode &top = data->m_vmanip.getNodeRefUnsafe(blockpos_nodes + positions[k]);
-			if (ndef->get(top).visuals->solidness != 2)
+			if (NDT_solidness[ndef->get(top).drawtype] != 2)
 				result &= ~(1 << k);
 		}
 	}
