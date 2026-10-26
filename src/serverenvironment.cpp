@@ -5,7 +5,9 @@
 #include <algorithm>
 #include <stack>
 #include <utility>
+#include <iterator>
 #include "serverenvironment.h"
+#include "common/c_types.h"
 #include "irr_aabb3d.h"
 #include "settings.h"
 #include "log.h"
@@ -296,14 +298,14 @@ ServerEnvironment::~ServerEnvironment()
 	m_map.reset();
 
 	// Delete ActiveBlockModifiers
-	for (ABMWithState &m_abm : m_abms) {
-		delete m_abm.abm;
+	for (ABMWithState &it : m_abms) {
+		delete it.abm;
+		it.abm = nullptr;
 	}
 
 	// Deallocate players
-	for (RemotePlayer *m_player : m_players) {
+	for (RemotePlayer *m_player : m_players)
 		delete m_player;
-	}
 	m_players.clear();
 
 	delete m_player_database;
@@ -1130,7 +1132,7 @@ void ServerEnvironment::step(float dtime)
 
 	// Send outdated detached inventories
 	if (!m_players.empty())
-		m_server->sendDetachedInventories(PEER_ID_INEXISTENT, true);
+		m_server->sendDetachedInventories();
 
 	// Notify mods of modified mapblocks
 	if (m_on_mapblocks_changed_receiver.receiving &&
@@ -1412,9 +1414,19 @@ u16 ServerEnvironment::addActiveObjectRaw(std::unique_ptr<ServerActiveObject> ob
 
 	// Register reference in scripting api (must be done before post-init)
 	m_script->addObjectReference(object);
+
 	// Post-initialize object
 	// Note that this can change the value of isStaticAllowed() in case of LuaEntitySAO
-	object->addedToEnvironment(dtime_s);
+	try {
+		object->addedToEnvironment(dtime_s);
+	} catch (const LuaError &e) {
+		errorstream << "ServerEnvironment::addActiveObjectRaw(): "
+				<< "object could not be added due to a Lua error" << std::endl;
+		// Don't add the object on a error to not duplicate static objects
+		// Need to remove the object again, since registerObject already added it
+		object->markForRemoval();
+		throw;
+	}
 
 	// Activate object
 	if (object->m_static_exists)
@@ -1495,19 +1507,8 @@ void ServerEnvironment::removeRemovedObjects()
 		/*
 			Move static data from active to stored if deactivated
 		*/
-		if (!obj->isPendingRemoval() && obj->m_static_exists) {
-			if (MapBlock *block = m_map->emergeBlock(obj->m_static_block, false)) {
-				if (!block->storeActiveObject(id)) {
-					warningstream << "ServerEnvironment::removeRemovedObjects(): "
-							<< "id=" << id << " m_static_exists=true but "
-							<< "static data doesn't actually exist in "
-							<< obj->m_static_block << std::endl;
-				}
-			} else {
-				infostream << "Failed to emerge block from which an object to "
-						<< "be deactivated was loaded from. id=" << id << std::endl;
-			}
-		}
+		if (!obj->isPendingRemoval())
+			finishDeactivation(obj, id);
 
 		processActiveObjectRemove(obj);
 
@@ -1695,7 +1696,22 @@ void ServerEnvironment::deactivateFarObjects(const bool _force_delete)
 		/*
 			Update the static data
 		*/
-		if (!obj->isGone() && obj->isStaticAllowed()) {
+		if (obj->isGone()) {
+			// This is only reached during shutdown.
+			sanity_check(force_delete);
+			if (obj->isPendingRemoval()) {
+				// In normal operation, when an object is marked for removal, its
+				// static data is deleted by the next call to removeRemovedObjects().
+				// But if shutdown happens first, the static data still exists here.
+				// Delete it the same way.
+				deleteStaticFromBlock(obj, id, MOD_REASON_REMOVE_OBJECTS_REMOVE, false);
+			} else {
+				// The object was previously marked for deactivation but kept around
+				// because it was known to a client. Now we're force-deleting it, so
+				// move its static data from the active list to the stored list.
+				finishDeactivation(obj, id);
+			}
+		} else if (obj->isStaticAllowed()) {
 			// Create new static object
 			StaticObject s_obj(obj, objectpos);
 
@@ -1738,6 +1754,8 @@ void ServerEnvironment::deactivateFarObjects(const bool _force_delete)
 
 			// Add to the block where the object is located in
 			v3s16 blockpos = getNodeBlockPos(floatToInt(objectpos, BS));
+
+			// If pending, save to active list, otherwise save to stored list.
 			u16 store_id = pending_delete ? id : 0;
 			if (!saveStaticToBlock(blockpos, store_id, obj, s_obj, reason))
 				force_delete = true;
@@ -1815,6 +1833,26 @@ bool ServerEnvironment::saveStaticToBlock(
 	obj->m_static_block = blockpos;
 
 	return true;
+}
+
+void ServerEnvironment::finishDeactivation(ServerActiveObject *obj, u16 id)
+{
+	if (!obj->m_static_exists)
+		return;
+
+	MapBlock *block = m_map->emergeBlock(obj->m_static_block, false);
+	if (!block) {
+		infostream << "Failed to emerge block from which an object to "
+				<< "be deactivated was loaded from. id=" << id << std::endl;
+		return;
+	}
+
+	if (!block->storeActiveObject(id)) {
+		warningstream << "ServerEnvironment::finishDeactivation(): "
+				<< "id=" << id << " m_static_exists=true but "
+				<< "static data doesn't actually exist in "
+				<< obj->m_static_block << std::endl;
+	}
 }
 
 void ServerEnvironment::processActiveObjectRemove(ServerActiveObject *obj)
